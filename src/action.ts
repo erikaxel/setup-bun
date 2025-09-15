@@ -73,27 +73,36 @@ export default async (options: Input): Promise<Output> => {
 
   let revision: string | undefined;
   let cacheHit = false;
-  if (cacheEnabled) {
-    const cacheKey = createHash("sha1").update(url).digest("base64");
+  
+  // Check if Bun executable already exists and matches requested version
+  const existingRevision = await getRevision(bunPath);
+  if (existingRevision && isVersionMatch(existingRevision, options.version)) {
+    revision = existingRevision;
+    cacheHit = true; // Treat as cache hit to avoid unnecessary network requests
+    info(`Using existing Bun installation: ${revision}`);
+  } else {
+    if (cacheEnabled) {
+      const cacheKey = createHash("sha1").update(url).digest("base64");
 
-    const cacheRestored = await restoreCache([bunPath], cacheKey);
-    if (cacheRestored) {
-      revision = await getRevision(bunPath);
-      if (revision) {
-        cacheHit = true;
-        info(`Using a cached version of Bun: ${revision}`);
-      } else {
-        warning(
-          `Found a cached version of Bun: ${revision} (but it appears to be corrupted?)`,
-        );
+      const cacheRestored = await restoreCache([bunPath], cacheKey);
+      if (cacheRestored) {
+        revision = await getRevision(bunPath);
+        if (revision) {
+          cacheHit = true;
+          info(`Using a cached version of Bun: ${revision}`);
+        } else {
+          warning(
+            `Found a cached version of Bun: ${revision} (but it appears to be corrupted?)`,
+          );
+        }
       }
     }
-  }
 
-  if (!cacheHit) {
-    info(`Downloading a new version of Bun: ${url}`);
-    // TODO: remove this, temporary fix for https://github.com/oven-sh/setup-bun/issues/73
-    revision = await retry(async () => await downloadBun(url, bunPath), 3);
+    if (!cacheHit) {
+      info(`Downloading a new version of Bun: ${url}`);
+      // TODO: remove this, temporary fix for https://github.com/oven-sh/setup-bun/issues/73
+      revision = await retry(async () => await downloadBun(url, bunPath), 3);
+    }
   }
 
   if (!revision) {
@@ -121,6 +130,20 @@ export default async (options: Input): Promise<Output> => {
     cacheHit,
   };
 };
+
+
+function isVersionMatch(existingRevision: string, requestedVersion?: string): boolean {
+  // If no version specified, default is "latest" - don't match existing
+  if (!requestedVersion) {
+    return false;
+  }
+
+  // Extract version from revision (format: "1.2.3+hash" or "1.2.3")
+  const [existingVersion] = existingRevision.split("+");
+  
+  // We only return true if version matches exactly, 'latest' will never match
+  return existingVersion === requestedVersion)
+}
 
 async function downloadBun(
   url: string,
