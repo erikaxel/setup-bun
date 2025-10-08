@@ -142,7 +142,7 @@ function isVersionMatch(existingRevision: string, requestedVersion?: string): bo
   const [existingVersion] = existingRevision.split("+");
   
   // We only return true if version matches exactly, 'latest' will never match
-  return existingVersion === requestedVersion)
+  return existingVersion === requestedVersion;
 }
 
 async function downloadBun(
@@ -217,17 +217,22 @@ async function extractBun(path: string): Promise<string> {
 }
 
 async function getRevision(exe: string): Promise<string | undefined> {
-  const revision = await getExecOutput(exe, ["--revision"], {
-    ignoreReturnCode: true,
-  });
-  if (revision.exitCode === 0 && /^\d+\.\d+\.\d+/.test(revision.stdout)) {
-    return revision.stdout.trim();
-  }
-  const version = await getExecOutput(exe, ["--version"], {
-    ignoreReturnCode: true,
-  });
-  if (version.exitCode === 0 && /^\d+\.\d+\.\d+/.test(version.stdout)) {
-    return version.stdout.trim();
+  try {
+    const revision = await getExecOutput(exe, ["--revision"], {
+      ignoreReturnCode: true,
+    });
+    if (revision.exitCode === 0 && /^\d+\.\d+\.\d+/.test(revision.stdout)) {
+      return revision.stdout.trim();
+    }
+    const version = await getExecOutput(exe, ["--version"], {
+      ignoreReturnCode: true,
+    });
+    if (version.exitCode === 0 && /^\d+\.\d+\.\d+/.test(version.stdout)) {
+      return version.stdout.trim();
+    }
+  } catch(error) {
+    // We can not find the executable or some other error occurred
+    return undefined;
   }
   return undefined;
 }
